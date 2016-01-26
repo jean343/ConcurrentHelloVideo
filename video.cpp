@@ -7,10 +7,9 @@ extern "C" {
 #include "ilclient.h"
 }
 
-static int video_decode_test(char *filename) {
+static int video_decode_test(char *filename, int x_offset, int y_offset, int width, int height) {
   OMX_VIDEO_PARAM_PORTFORMATTYPE format;
-  OMX_TIME_CONFIG_CLOCKSTATETYPE cstate;
-  COMPONENT_T *video_decode = NULL, *video_scheduler = NULL, *video_render = NULL, *clock = NULL;
+  COMPONENT_T *video_decode = NULL, *video_render = NULL;
   COMPONENT_T * list[3];
   TUNNEL_T tunnel[2];
   ILCLIENT_T *client;
@@ -54,10 +53,10 @@ static int video_decode_test(char *filename) {
   configDisplay.fullscreen = OMX_FALSE;
   configDisplay.noaspect = OMX_TRUE;
   configDisplay.set = (OMX_DISPLAYSETTYPE) (OMX_DISPLAY_SET_DEST_RECT | OMX_DISPLAY_SET_SRC_RECT | OMX_DISPLAY_SET_FULLSCREEN | OMX_DISPLAY_SET_NOASPECT);
-  configDisplay.dest_rect.x_offset = 100;
-  configDisplay.dest_rect.y_offset = 100;
-  configDisplay.dest_rect.width = 640;
-  configDisplay.dest_rect.height = 480;
+  configDisplay.dest_rect.x_offset = x_offset;
+  configDisplay.dest_rect.y_offset = y_offset;
+  configDisplay.dest_rect.width = width;
+  configDisplay.dest_rect.height = height;
 
   OMX_SetParameter(ILC_GET_HANDLE(video_render), OMX_IndexConfigDisplayRegion, &configDisplay);
 
@@ -153,7 +152,19 @@ static int video_decode_test(char *filename) {
 
 int main(int argc, char **argv) {
   bcm_host_init();
-  return video_decode_test("video-LQ.h264");
+
+  int width = 1920;
+  int height = 1080;
+  int cols = 2;
+  int rows = 2;
+
+  for (int x = 0; x < cols; x++) {
+    for (int y = 0; y < rows; y++) {
+      int xoff = x * (width / cols);
+      int yoff = y * (height / rows);
+      video_decode_test("video-LQ.h264", xoff, yoff, width / cols, height / rows);
+    }
+  }
 }
 
 
