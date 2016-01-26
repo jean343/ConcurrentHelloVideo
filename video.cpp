@@ -10,7 +10,54 @@ extern "C" {
 #include "ilclient.h"
 }
 
-static int video_decode_test(const char *filename, int x_offset, int y_offset, int width, int height) {
+static char const *err2str(int err) {
+  switch (err) {
+    case OMX_ErrorInsufficientResources: return "OMX_ErrorInsufficientResources";
+    case OMX_ErrorUndefined: return "OMX_ErrorUndefined";
+    case OMX_ErrorInvalidComponentName: return "OMX_ErrorInvalidComponentName";
+    case OMX_ErrorComponentNotFound: return "OMX_ErrorComponentNotFound";
+    case OMX_ErrorInvalidComponent: return "OMX_ErrorInvalidComponent";
+    case OMX_ErrorBadParameter: return "OMX_ErrorBadParameter";
+    case OMX_ErrorNotImplemented: return "OMX_ErrorNotImplemented";
+    case OMX_ErrorUnderflow: return "OMX_ErrorUnderflow";
+    case OMX_ErrorOverflow: return "OMX_ErrorOverflow";
+    case OMX_ErrorHardware: return "OMX_ErrorHardware";
+    case OMX_ErrorInvalidState: return "OMX_ErrorInvalidState";
+    case OMX_ErrorStreamCorrupt: return "OMX_ErrorStreamCorrupt";
+    case OMX_ErrorPortsNotCompatible: return "OMX_ErrorPortsNotCompatible";
+    case OMX_ErrorResourcesLost: return "OMX_ErrorResourcesLost";
+    case OMX_ErrorNoMore: return "OMX_ErrorNoMore";
+    case OMX_ErrorVersionMismatch: return "OMX_ErrorVersionMismatch";
+    case OMX_ErrorNotReady: return "OMX_ErrorNotReady";
+    case OMX_ErrorTimeout: return "OMX_ErrorTimeout";
+    case OMX_ErrorSameState: return "OMX_ErrorSameState";
+    case OMX_ErrorResourcesPreempted: return "OMX_ErrorResourcesPreempted";
+    case OMX_ErrorPortUnresponsiveDuringAllocation: return "OMX_ErrorPortUnresponsiveDuringAllocation";
+    case OMX_ErrorPortUnresponsiveDuringDeallocation: return "OMX_ErrorPortUnresponsiveDuringDeallocation";
+    case OMX_ErrorPortUnresponsiveDuringStop: return "OMX_ErrorPortUnresponsiveDuringStop";
+    case OMX_ErrorIncorrectStateTransition: return "OMX_ErrorIncorrectStateTransition";
+    case OMX_ErrorIncorrectStateOperation: return "OMX_ErrorIncorrectStateOperation";
+    case OMX_ErrorUnsupportedSetting: return "OMX_ErrorUnsupportedSetting";
+    case OMX_ErrorUnsupportedIndex: return "OMX_ErrorUnsupportedIndex";
+    case OMX_ErrorBadPortIndex: return "OMX_ErrorBadPortIndex";
+    case OMX_ErrorPortUnpopulated: return "OMX_ErrorPortUnpopulated";
+    case OMX_ErrorComponentSuspended: return "OMX_ErrorComponentSuspended";
+    case OMX_ErrorDynamicResourcesUnavailable: return "OMX_ErrorDynamicResourcesUnavailable";
+    case OMX_ErrorMbErrorsInFrame: return "OMX_ErrorMbErrorsInFrame";
+    case OMX_ErrorFormatNotDetected: return "OMX_ErrorFormatNotDetected";
+    case OMX_ErrorContentPipeOpenFailed: return "OMX_ErrorContentPipeOpenFailed";
+    case OMX_ErrorContentPipeCreationFailed: return "OMX_ErrorContentPipeCreationFailed";
+    case OMX_ErrorSeperateTablesUsed: return "OMX_ErrorSeperateTablesUsed";
+    case OMX_ErrorTunnelingUnsupported: return "OMX_ErrorTunnelingUnsupported";
+    default: return "unknown error";
+  }
+}
+
+static void error_callback(void *userdata, COMPONENT_T *comp, OMX_U32 data) {
+  fprintf(stderr, "OMX error %s\n", err2str(data));
+}
+
+static int video_decode_test(int i, const char *filename, int x_offset, int y_offset, int width, int height) {
   OMX_VIDEO_PARAM_PORTFORMATTYPE format;
   COMPONENT_T *video_decode = NULL, *video_render = NULL;
   COMPONENT_T * list[3];
@@ -37,6 +84,8 @@ static int video_decode_test(const char *filename, int x_offset, int y_offset, i
     return -4;
   }
 
+  ilclient_set_error_callback(client, error_callback, NULL);
+
   // create video_decode
   if (ilclient_create_component(client, &video_decode, "video_decode", (ILCLIENT_CREATE_FLAGS_T) (ILCLIENT_DISABLE_ALL_PORTS | ILCLIENT_ENABLE_INPUT_BUFFERS)) != 0)
     status = -14;
@@ -61,12 +110,15 @@ static int video_decode_test(const char *filename, int x_offset, int y_offset, i
   configDisplay.dest_rect.width = width;
   configDisplay.dest_rect.height = height;
 
-  OMX_SetParameter(ILC_GET_HANDLE(video_render), OMX_IndexConfigDisplayRegion, &configDisplay);
+  if (OMX_SetParameter(ILC_GET_HANDLE(video_render), OMX_IndexConfigDisplayRegion, &configDisplay) != OMX_ErrorNone) {
+    printf("OMX_GetParameter failed\n");
+  }
 
   set_tunnel(tunnel, video_decode, 131, video_render, 90);
 
   if (status == 0)
     ilclient_change_component_state(video_decode, OMX_StateIdle);
+
 
   memset(&format, 0, sizeof (OMX_VIDEO_PARAM_PORTFORMATTYPE));
   format.nSize = sizeof (OMX_VIDEO_PARAM_PORTFORMATTYPE);
@@ -74,15 +126,33 @@ static int video_decode_test(const char *filename, int x_offset, int y_offset, i
   format.nPortIndex = 130;
   format.eCompressionFormat = OMX_VIDEO_CodingAVC;
 
-  if (status == 0 &&
-          OMX_SetParameter(ILC_GET_HANDLE(video_decode), OMX_IndexParamVideoPortFormat, &format) == OMX_ErrorNone &&
-          ilclient_enable_port_buffers(video_decode, 130, NULL, NULL, NULL) == 0) {
+  if (OMX_SetParameter(ILC_GET_HANDLE(video_decode), OMX_IndexParamVideoPortFormat, &format) != OMX_ErrorNone) {
+    printf("OMX_SetParameter OMX_IndexParamVideoPortFormat failed\n");
+  }
+
+  OMX_PARAM_PORTDEFINITIONTYPE portdef;
+  portdef.nSize = sizeof (OMX_PARAM_PORTDEFINITIONTYPE);
+  portdef.nVersion.nVersion = OMX_VERSION;
+  portdef.nPortIndex = 130;
+  if (OMX_GetParameter(ILC_GET_HANDLE(video_decode), OMX_IndexParamPortDefinition, &portdef) == OMX_ErrorNone) {
+    printf("OMX_GetParameter\n");
+    portdef.nBufferCountActual = portdef.nBufferCountMin;
+    portdef.nBufferSize = 4 * 1024;
+    if (OMX_SetParameter(ILC_GET_HANDLE(video_decode), OMX_IndexParamPortDefinition, &portdef) != OMX_ErrorNone) {
+      printf("OMX_SetParameter error\n");
+    }
+  }
+
+  printf("%d ilclient_enable_port_buffers\n", i);
+  if (status == 0 && ilclient_enable_port_buffers(video_decode, 130, NULL, NULL, NULL) == 0) {
     OMX_BUFFERHEADERTYPE *buf;
     int port_settings_changed = 0;
     int first_packet = 1;
 
+    printf("%d ilclient_change_component_state\n", i);
     ilclient_change_component_state(video_decode, OMX_StateExecuting);
 
+    printf("%d ilclient_get_input_buffer\n", i);
     while ((buf = ilclient_get_input_buffer(video_decode, 130, 1)) != NULL) {
       // feed data and wait until we get port settings changed
       unsigned char *dest = buf->pBuffer;
@@ -94,7 +164,7 @@ static int video_decode_test(const char *filename, int x_offset, int y_offset, i
               (data_len == 0 && ilclient_wait_for_event(video_decode, OMX_EventPortSettingsChanged, 131, 0, 0, 1,
               ILCLIENT_EVENT_ERROR | ILCLIENT_PARAMETER_CHANGED, 10000) == 0))) {
         port_settings_changed = 1;
-
+        printf("%d port_settings_changed\n", i);
         if (ilclient_setup_tunnel(tunnel, 0, 0) != 0) {
           status = -7;
           break;
@@ -153,22 +223,25 @@ static int video_decode_test(const char *filename, int x_offset, int y_offset, i
   return status;
 }
 
-int main(int argc, char **argv) {
+int main() {
   bcm_host_init();
 
   int width = 1920;
   int height = 1080;
-  int cols = 2;
-  int rows = 2;
+  int cols = 4;
+  int rows = 3;
 
   boost::thread_group g;
 
+  int i = 1;
   for (int x = 0; x < cols; x++) {
     for (int y = 0; y < rows; y++) {
       int xoff = x * (width / cols);
       int yoff = y * (height / rows);
 
-      g.create_thread(boost::bind(video_decode_test, "video-LQ-640.h264", xoff, yoff, width / cols, height / rows));
+      g.create_thread(boost::bind(video_decode_test, i, "video-LQ-640.h264", xoff, yoff, width / cols, height / rows));
+      usleep(1000 * 100);
+      i++;
     }
   }
   g.join_all();
