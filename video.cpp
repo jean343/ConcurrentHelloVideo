@@ -78,12 +78,6 @@ static int video_decode_test(int i, const char *filename, int x_offset, int y_of
     return -3;
   }
 
-  if (OMX_Init() != OMX_ErrorNone) {
-    ilclient_destroy(client);
-    fclose(in);
-    return -4;
-  }
-
   ilclient_set_error_callback(client, error_callback, NULL);
 
   // create video_decode
@@ -137,7 +131,7 @@ static int video_decode_test(int i, const char *filename, int x_offset, int y_of
   if (OMX_GetParameter(ILC_GET_HANDLE(video_decode), OMX_IndexParamPortDefinition, &portdef) == OMX_ErrorNone) {
     printf("OMX_GetParameter\n");
     portdef.nBufferCountActual = portdef.nBufferCountMin;
-    portdef.nBufferSize = 4 * 1024;
+    portdef.nBufferSize = 32 * 1024;
     if (OMX_SetParameter(ILC_GET_HANDLE(video_decode), OMX_IndexParamPortDefinition, &portdef) != OMX_ErrorNone) {
       printf("OMX_SetParameter error\n");
     }
@@ -166,6 +160,7 @@ static int video_decode_test(int i, const char *filename, int x_offset, int y_of
         port_settings_changed = 1;
         printf("%d port_settings_changed\n", i);
         if (ilclient_setup_tunnel(tunnel, 0, 0) != 0) {
+          printf("%d ilclient_setup_tunnel failed\n", i);
           status = -7;
           break;
         }
@@ -186,6 +181,7 @@ static int video_decode_test(int i, const char *filename, int x_offset, int y_of
         buf->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;
 
       if (OMX_EmptyThisBuffer(ILC_GET_HANDLE(video_decode), buf) != OMX_ErrorNone) {
+        printf("%d OMX_EmptyThisBuffer failed\n", i);
         status = -6;
         break;
       }
@@ -225,6 +221,11 @@ static int video_decode_test(int i, const char *filename, int x_offset, int y_of
 
 int main() {
   bcm_host_init();
+
+
+  if (OMX_Init() != OMX_ErrorNone) {
+    return -4;
+  }
 
   int width = 1920;
   int height = 1080;
