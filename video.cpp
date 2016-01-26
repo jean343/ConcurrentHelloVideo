@@ -1,13 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+#include <boost/thread.hpp>
 
 #include "bcm_host.h"
 extern "C" {
 #include "ilclient.h"
 }
 
-static int video_decode_test(char *filename, int x_offset, int y_offset, int width, int height) {
+static int video_decode_test(const char *filename, int x_offset, int y_offset, int width, int height) {
   OMX_VIDEO_PARAM_PORTFORMATTYPE format;
   COMPONENT_T *video_decode = NULL, *video_render = NULL;
   COMPONENT_T * list[3];
@@ -52,7 +55,7 @@ static int video_decode_test(char *filename, int x_offset, int y_offset, int wid
   configDisplay.nPortIndex = 90;
   configDisplay.fullscreen = OMX_FALSE;
   configDisplay.noaspect = OMX_TRUE;
-  configDisplay.set = (OMX_DISPLAYSETTYPE) (OMX_DISPLAY_SET_DEST_RECT | OMX_DISPLAY_SET_SRC_RECT | OMX_DISPLAY_SET_FULLSCREEN | OMX_DISPLAY_SET_NOASPECT);
+  configDisplay.set = (OMX_DISPLAYSETTYPE) (OMX_DISPLAY_SET_DEST_RECT | OMX_DISPLAY_SET_FULLSCREEN | OMX_DISPLAY_SET_NOASPECT);
   configDisplay.dest_rect.x_offset = x_offset;
   configDisplay.dest_rect.y_offset = y_offset;
   configDisplay.dest_rect.width = width;
@@ -158,13 +161,17 @@ int main(int argc, char **argv) {
   int cols = 2;
   int rows = 2;
 
+  boost::thread_group g;
+
   for (int x = 0; x < cols; x++) {
     for (int y = 0; y < rows; y++) {
       int xoff = x * (width / cols);
       int yoff = y * (height / rows);
-      video_decode_test("video-LQ.h264", xoff, yoff, width / cols, height / rows);
+
+      g.create_thread(boost::bind(video_decode_test, "video-LQ-640.h264", xoff, yoff, width / cols, height / rows));
     }
   }
+  g.join_all();
 }
 
 
