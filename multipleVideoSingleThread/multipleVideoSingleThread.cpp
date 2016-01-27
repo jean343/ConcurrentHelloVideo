@@ -3,8 +3,6 @@
 #include <string.h>
 #include <unistd.h>
 
-//#include <boost/thread.hpp>
-
 #include "bcm_host.h"
 extern "C" {
 #include "ilclient.h"
