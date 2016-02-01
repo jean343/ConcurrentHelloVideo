@@ -6,3 +6,4 @@ include_directories(/opt/vc/include /opt/vc/src/hello_pi/libs/ilclient/ ${Boost_
 add_subdirectory(multipleVideoSingleThread)
 add_subdirectory(video)
 add_subdirectory(videoPerf)
+add_subdirectory(opengl)
